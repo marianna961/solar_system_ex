@@ -1,72 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'dart:math';
 
 void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: SolarSystemScreen(),
-    );
-  }
-}
-
-class SolarSystemScreen extends StatefulWidget {
-  @override
-  _SolarSystemScreenState createState() => _SolarSystemScreenState();
-}
-
-class _SolarSystemScreenState extends State<SolarSystemScreen> {
-  List<Planet> planets = [];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Солнечная система"),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (context) => AddPlanetScreen(onPlanetAdded: (planet) {
-                  setState(() {
-                    planets.add(planet);
-                  });
-                  Navigator.of(context).pop();
-                }),
-              ));
-            },
-          ),
-        ],
-      ),
-      body: Center(
-        child: Stack(
-          children: [
-            Sun(),
-            for (var planet in planets) PlanetWidget(planet: planet),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class Sun extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 100.0,
-      height: 100.0,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.yellow,
-      ),
-    );
-  }
+  runApp(
+    MaterialApp(
+      home: SolarSystemApp(),
+    ),
+  );
 }
 
 class Planet {
@@ -83,52 +23,119 @@ class Planet {
   });
 }
 
-class PlanetWidget extends StatefulWidget {
-  final Planet planet;
-
-  PlanetWidget({required this.planet});
-
+class SolarSystemApp extends StatefulWidget {
   @override
-  _PlanetWidgetState createState() => _PlanetWidgetState();
+  _SolarSystemAppState createState() => _SolarSystemAppState();
 }
 
-class _PlanetWidgetState extends State<PlanetWidget> {
-  double angle = 0.0;
+class _SolarSystemAppState extends State<SolarSystemApp> {
+  final List<Planet> planets = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: Text('Солнечная Система'),
+        ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: Center(
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.yellow,
+                  ),
+                ),
+              ),
+            ),
+            for (var i = 0; i < planets.length; i++)
+              Positioned.fill(
+                child: AnimatedPlanet(
+                  planet: planets[i],
+                  orbitRadius: (i + 1) * 75.0,
+                ),
+              ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => AddPlanetScreen(
+                  onPlanetAdded: (Planet planet) {
+                    setState(() {
+                      planets.add(planet);
+                    });
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ),
+            );
+          },
+          child: Icon(Icons.add),
+        ),
+      ),
+    );
+  }
+}
+
+class AnimatedPlanet extends StatefulWidget {
+  final Planet planet;
+  final double orbitRadius;
+
+  AnimatedPlanet({required this.planet, required this.orbitRadius});
+
+  @override
+  _AnimatedPlanetState createState() => _AnimatedPlanetState();
+}
+
+class _AnimatedPlanetState extends State<AnimatedPlanet>
+    with TickerProviderStateMixin {
+  late AnimationController _rotationController;
 
   @override
   void initState() {
     super.initState();
-    rotatePlanet();
+    _rotationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat();
   }
 
-  void rotatePlanet() {
-    Future.delayed(Duration(milliseconds: 50), () {
-      setState(() {
-        angle += widget.planet.rotationSpeed;
-        if (angle >= 360) angle = 0;
-      });
-      rotatePlanet();
-    });
+  @override
+  void dispose() {
+    _rotationController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final x =
-        widget.planet.distance * 100.0 * 2.0 * (angle / 360) * 3.14159265359;
-    final y =
-        widget.planet.distance * 100.0 * 2.0 * (angle / 360) * 3.14159265359;
-
-    return Positioned(
-      left: 200 + x,
-      top: 200 + y,
-      child: Container(
-        width: widget.planet.radius,
-        height: widget.planet.radius,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: widget.planet.color,
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: _rotationController,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: _rotationController.value * 2 * pi,
+          child: Stack(
+            children: [
+              Positioned(
+                top: widget.orbitRadius,
+                child: Container(
+                  width: widget.planet.radius,
+                  height: widget.planet.radius,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: widget.planet.color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -143,81 +150,73 @@ class AddPlanetScreen extends StatefulWidget {
 }
 
 class _AddPlanetScreenState extends State<AddPlanetScreen> {
-  double radius = 20.0;
-  Color color = Colors.blue;
-  double distance = 2.0;
-  double rotationSpeed = 1.0;
+  double _radius = 0;
+  Color _color = Colors.transparent;
+  double _distance = 0;
+  double _rotationSpeed = 1;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Добавить планету"),
+        title: Text('Добавить планету'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Slider(
-              value: radius,
-              min: 10.0,
-              max: 50.0,
-              onChanged: (value) {
-                setState(() {
-                  radius = value;
-                });
-              },
+      body: SingleChildScrollView(
+        child: Form(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                TextFormField(
+                  decoration: InputDecoration(labelText: 'Радиус'),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    setState(() {
+                      _radius = double.parse(value);
+                    });
+                  },
+                ),
+                TextFormField(
+                  decoration: InputDecoration(labelText: 'Цвет'),
+                  onChanged: (value) {
+                    setState(() {
+                      _color = Color(int.parse(value, radix: 16));
+                    });
+                  },
+                ),
+                TextFormField(
+                  decoration: InputDecoration(labelText: 'Расстояние'),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    setState(() {
+                      _distance = double.parse(value);
+                    });
+                  },
+                ),
+                TextFormField(
+                  decoration: InputDecoration(labelText: 'Скорость вращения'),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    setState(() {
+                      _rotationSpeed = double.parse(value);
+                    });
+                  },
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final planet = Planet(
+                      radius: _radius,
+                      color: _color,
+                      distance: _distance,
+                      rotationSpeed: _rotationSpeed,
+                    );
+                    widget.onPlanetAdded(planet);
+                  },
+                  child: Text('Добавить'),
+                ),
+              ],
             ),
-            Text("Радиус планеты: $radius"),
-            SizedBox(height: 20.0),
-            ColorPicker(
-              pickerColor: color,
-              onColorChanged: (newColor) {
-                setState(() {
-                  color = newColor;
-                });
-              },
-              showLabel: true,
-              pickerAreaHeightPercent: 0.8,
-            ),
-            SizedBox(height: 20.0),
-            Slider(
-              value: distance,
-              min: 1.0,
-              max: 4.0,
-              onChanged: (value) {
-                setState(() {
-                  distance = value;
-                });
-              },
-            ),
-            Text("Удаленность: $distance"),
-            SizedBox(height: 20.0),
-            Slider(
-              value: rotationSpeed,
-              min: 0.1,
-              max: 5.0,
-              onChanged: (value) {
-                setState(() {
-                  rotationSpeed = value;
-                });
-              },
-            ),
-            Text("Скорость вращения: $rotationSpeed"),
-            SizedBox(height: 20.0),
-            ElevatedButton(
-              onPressed: () {
-                final newPlanet = Planet(
-                  radius: radius,
-                  color: color,
-                  distance: distance,
-                  rotationSpeed: rotationSpeed,
-                );
-                widget.onPlanetAdded(newPlanet);
-              },
-              child: Text("Добавить планету"),
-            ),
-          ],
+          ),
         ),
       ),
     );
